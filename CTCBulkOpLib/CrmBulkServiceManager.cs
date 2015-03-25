@@ -48,7 +48,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             _Service = crmService;
             _Services = new List<IOrganizationService>();
             _Services.Add(_Service);
-            
+
         }
 
         /// <summary>
@@ -116,14 +116,14 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// </summary>
         /// <param name="q"></param>
         /// <param name="action"></param>
-        private void QueryToAction(QueryExpression q,  Action<EntityCollection> action)
+        private void QueryToAction(QueryExpression q, Action<EntityCollection> action)
         {
-            
+
             int pageCount = 1;
 
             while (true)
             {
-                
+
                 var results = _Service.RetrieveMultiple(q);
 
                 action(results);
@@ -140,7 +140,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                     break;
             }
 
-            
+
         }
         /// <summary>
         /// Query records, update with data provided in UpdateEntity
@@ -153,7 +153,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         {
             CTCRunMultipleResponse finalResults = new CTCRunMultipleResponse();
             finalResults.ResultItems = new List<CTCRunMultipleResponseItem>();
-            
+
             QueryToAction(q, (entityList) =>
             {
 
@@ -170,7 +170,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 var results = BulkUpdate(entitiesToUpdate, batchSize: batchSize);
                 finalResults.ResultItems.AddRange(results.ResultItems);
                 finalResults.StoppedEarly = results.StoppedEarly;
-                
+
             });
 
             return finalResults;
@@ -395,21 +395,30 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                         req.Settings.ContinueOnError = currentTask.ContinueOnError;
                         req.Settings.ReturnResponses = currentTask.ReturnResponses;
                         req.Requests.AddRange(currentTask.Requests);
-                        var response = _Service.Execute(req) as ExecuteMultipleResponse;
-
-                        foreach (var item in response.Responses)
+                        try
                         {
-                            CTCRunMultipleResponseItem resultItem = new CTCRunMultipleResponseItem();
+                            var response = _Service.Execute(req) as ExecuteMultipleResponse;
 
-                            resultItem.Fault = item.Fault;
-                            resultItem.Request = req.Requests[item.RequestIndex];
-                            resultItem.Response = item.Response;
-                            currentTask.Responses.Add(resultItem);
 
+                            foreach (var item in response.Responses)
+                            {
+                                CTCRunMultipleResponseItem resultItem = new CTCRunMultipleResponseItem();
+
+                                resultItem.Fault = item.Fault;
+                                resultItem.Request = req.Requests[item.RequestIndex];
+                                resultItem.Response = item.Response;
+                                currentTask.Responses.Add(resultItem);
+
+                            }
+                            if ((!state.ContinueOnError) && (response.IsFaulted))
+                            {
+                                state.Results.StoppedEarly = true;
+                            }
                         }
-                        if ((!state.ContinueOnError) && (response.IsFaulted))
+
+                        catch (FaultException<OrganizationServiceFault> fault)
                         {
-                            state.Results.StoppedEarly = true;
+                             RunMultipleRequestsHandleFault(state, fault);
                         }
                     }
                     else
@@ -428,14 +437,14 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                         }
                     }
 
-                    
+
                 });
 
-            foreach(var task in taskStateList)
+            foreach (var task in taskStateList)
             {
                 state.Results.ResultItems.AddRange(task.Responses);
             }
-           
+
         }
 
     }
@@ -487,7 +496,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
 
         public IEnumerable<OrganizationRequest> Requests { get; set; }
 
-        public  List<CTCRunMultipleResponseItem> Responses { get; set; }
+        public List<CTCRunMultipleResponseItem> Responses { get; set; }
         public bool ContinueOnError { get; set; }
         public bool ReturnResponses { get; set; }
     }
