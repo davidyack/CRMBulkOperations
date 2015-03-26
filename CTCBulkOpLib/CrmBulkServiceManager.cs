@@ -87,26 +87,39 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             }
             return results;
         }
+   
         /// <summary>
         /// Bulk update the list of entities provided
         /// </summary>
         /// <param name="entityList"></param>
         /// <param name="batchSize"></param>
+        /// <param name="useUpsert"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkUpdate(List<Entity> entityList, int batchSize = 500)
+        public CTCRunMultipleResponse BulkUpdate(List<Entity> entityList, int batchSize = 500, bool useUpsert=false)
         {
             var requests = new List<OrganizationRequest>();
             foreach (var entity in entityList)
             {
-                requests.Add(new UpdateRequest() { Target = entity });
+                if (useUpsert)
+                    requests.Add(new UpsertRequest () { Target = entity });
+                else
+                    requests.Add(new UpdateRequest() { Target = entity });
             }
 
             var results = RunMultipleRequests(requests, batchSize: batchSize);
             foreach (var item in results.ResultItems)
             {
-                var updateReq = item.Request as UpdateRequest;
-                if (updateReq != null)
+                if (item.Request is UpdateRequest)
+                {
+                    var updateReq = item.Request as UpdateRequest;                    
                     item.ItemID = updateReq.Target.Id;
+                }
+                else if (item.Request is UpsertRequest)
+                {
+                    var upsertRequest = item.Request as UpsertRequest;
+                    var upsertResponse = item.Response as UpsertResponse;
+                    item.ItemID = upsertResponse.Target.Id;                                            
+                }
             }
             return results;
         }

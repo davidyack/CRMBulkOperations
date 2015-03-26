@@ -211,6 +211,63 @@ namespace CTCBulkOpLibTests
 
 
         }
+
+        [TestMethod]
+        public void BulkUpsertTestInsert()
+        {
+            CrmConnection c = new CrmConnection("CRM");
+            OrganizationService service = new OrganizationService(c);
+            CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
+
+            List<Entity> entityList = new List<Entity>();
+            for (int i = 0; i < 10; i++)
+            {
+                Entity entity = new Entity("account");
+                entity["name"] = "account " + DateTime.Now.ToString();
+                entityList.Add(entity);
+            }
+
+            var results = mgr.BulkUpdate(entityList,useUpsert:true);
+
+
+        }
+
+        [TestMethod]
+        public void BulkUpsertTestInsertAndUpdate()
+        {
+            CrmConnection c = new CrmConnection("CRM");
+            OrganizationService service = new OrganizationService(c);
+            CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
+
+            List<Entity> entityList = new List<Entity>();
+            for (int i = 0; i < 10; i++)
+            {
+                Entity entity = new Entity("account");
+                entity["name"] = "account " + DateTime.Now.ToString();
+                entityList.Add(entity);
+            }
+
+            var resultsInsert = mgr.BulkInsert(entityList);
+            entityList.Clear();
+            foreach (var item in resultsInsert.ResultItems)
+            {
+                Entity entity = new Entity("account");
+                entity.Id = item.ItemID;
+                entity["name"] = "account " + DateTime.Now.ToString();
+                entityList.Add(entity);
+            }
+            
+            for (int i = 0; i < 10; i++)
+            {
+                Entity entity = new Entity("account");
+                entity["name"] = "account " + DateTime.Now.ToString();
+                entityList.Add(entity);
+            }
+
+            var results = mgr.BulkUpdate(entityList, useUpsert: true);
+
+
+        }
         [TestMethod]
         public void BulkUpdateQueryTest1()
         {
