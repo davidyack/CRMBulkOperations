@@ -364,6 +364,16 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             return results;
         }
         /// <summary>
+        /// Run an array of transactions
+        /// </summary>
+        /// <param name="requests"></param>
+        /// <returns></returns>
+        public CTCRunMultipleResponse BulkTransaction(OrganizationRequest[] requests)
+        {
+            return RunMultipleRequests(requests.ToList< OrganizationRequest>(), transactionMode: CTCBulkTransactionMode.Single );
+
+        }
+        /// <summary>
         /// Worker method to run multiple requests used by all helper methods but can be used standalone to invoke any series of CRM Organization Requests
         /// </summary>
         /// <param name="requests"></param>

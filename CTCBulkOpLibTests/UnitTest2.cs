@@ -13,14 +13,35 @@ namespace CTCBulkOpLibTests
         [TestMethod]
         public void TestApplyAccount()
         {
-            CrmConnection c = new CrmConnection("CRM");
-            OrganizationService service = new OrganizationService(c);
-            CrmConnection c2 = new CrmConnection("CRM2");
-            OrganizationService service2 = new OrganizationService(c2);
-            CrmChangeTrackingManager mgr = new CrmChangeTrackingManager(service);
+            CrmConnection connectionSource = new CrmConnection("CRM");
+            OrganizationService serviceSource = new OrganizationService(connectionSource);
 
-            //mgr.ApplyChanges(service2,"account", new ColumnSet(new string[] {"name"}));
-            mgr.ApplyChanges(service2, "account", new ColumnSet(true));
+            CrmConnection connectionTarget = new CrmConnection("CRM2");
+            OrganizationService serviceTarget = new OrganizationService(connectionTarget);
+
+            CrmChangeTrackingManager mgr = new CrmChangeTrackingManager(serviceSource);
+
+            mgr.ApplyChanges(serviceTarget, "account", new ColumnSet(true));
+
+        }
+
+        [TestMethod]
+        public void TestApplyAccountAndContact()
+        {
+            CrmConnection connectionSource = new CrmConnection("CRM");
+            OrganizationService serviceSource = new OrganizationService(connectionSource);
+
+            CrmConnection connectionTarget = new CrmConnection("CRM2");
+            OrganizationService serviceTarget = new OrganizationService(connectionTarget);
+
+            CrmChangeTrackingManager mgr = new CrmChangeTrackingManager(serviceSource);
+            
+            mgr.ApplyChanges(serviceTarget,new ApplyChangesOptions[] 
+                                 { 
+                                     new ApplyChangesOptions() { EntityName="account", Columns=new ColumnSet(true)},
+                                     new ApplyChangesOptions() { EntityName="contact", Columns=new ColumnSet(true)},
+                                 });
+
         }
     }
 }
