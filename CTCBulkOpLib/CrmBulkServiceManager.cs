@@ -62,6 +62,38 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             _Services.AddRange(serviceList);
 
         }
+        public CTCRunMultipleResponse BulkDelete(List<EntityReference> entityrefList, int batchSize = 500,
+           CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
+        {
+            var requests = new List<OrganizationRequest>();
+            foreach (var entityRef in entityrefList)
+            {
+                requests.Add(new DeleteRequest() { Target = entityRef });
+            }
+
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+            
+            return results;
+        }
+
+        public CTCRunMultipleResponse BulkUpsertAndDelete(List<Entity> entitiesToUpdate,List<EntityReference> entitiesToDelete, int batchSize = 500,
+           CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
+        {
+            var requests = new List<OrganizationRequest>();
+
+            foreach (var entity in entitiesToUpdate)
+            {
+                requests.Add(new UpsertRequest() { Target = entity });
+            }
+            foreach (var entityRef in entitiesToDelete)
+            {
+                requests.Add(new DeleteRequest() { Target = entityRef });
+            }
+
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+
+            return results;
+        }
 
         /// <summary>
         /// Bulk Delete By Query
