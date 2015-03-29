@@ -18,6 +18,21 @@ namespace CTCBulkOpLibTests
         [TestMethod]
         public void BasicRunMultipleTest()
         {
+            ExecuteBasicRunMultipleTest();
+        }
+        [TestMethod]
+        public void BasicRunMultipleTestTModeSingle()
+        {
+            ExecuteBasicRunMultipleTest(transactionMode: CTCBulkTransactionMode.Single);
+        }
+        [TestMethod]
+        public void BasicRunMultipleTestTModeBatch()
+        {
+            ExecuteBasicRunMultipleTest(transactionMode: CTCBulkTransactionMode.Batch);
+        }
+
+        private static void ExecuteBasicRunMultipleTest(int batchSize=10,CTCBulkTransactionMode transactionMode= CTCBulkTransactionMode.None)
+        {
             CrmConnection c = new CrmConnection("CRM");
             OrganizationService service = new OrganizationService(c);
             CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
@@ -29,8 +44,7 @@ namespace CTCBulkOpLibTests
                 requests.Add(req);
             }
 
-            var results = mgr.RunMultipleRequests(requests, batchSize: 10);
-
+            var results = mgr.RunMultipleRequests(requests, batchSize: batchSize, transactionMode:transactionMode);
         }
 
        
@@ -38,6 +52,33 @@ namespace CTCBulkOpLibTests
 
         [TestMethod]
         public void ExcessiveBatchSizeRunMultipleTest()
+        {
+            ExecuteExcessiveBatchSize();
+        }
+        [TestMethod]
+        public void ExcessiveBatchSizeRunMultipleTModeSingle()
+        {
+            bool singleFailed = false;
+            try
+            {
+                ExecuteExcessiveBatchSize(transactionMode: CTCBulkTransactionMode.Single);
+            }
+            catch(Exception ex)
+            {
+                if (ex.Message.Contains("batch size exceeds"))
+                    singleFailed = true;
+            }
+
+            Assert.IsTrue(singleFailed);
+
+        }
+        [TestMethod]
+        public void ExcessiveBatchSizeRunMultipleTModeBatch()
+        {
+            ExecuteExcessiveBatchSize(transactionMode: CTCBulkTransactionMode.Batch);
+        }
+
+        private static void ExecuteExcessiveBatchSize(CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             CrmConnection c = new CrmConnection("CRM");
             OrganizationService service = new OrganizationService(c);
@@ -50,8 +91,7 @@ namespace CTCBulkOpLibTests
                 requests.Add(req);
             }
 
-            var results = mgr.RunMultipleRequests(requests, batchSize: 1100);
-
+            var results = mgr.RunMultipleRequests(requests, batchSize: 1100,transactionMode:transactionMode);
         }
 
         [TestMethod]
@@ -113,7 +153,7 @@ namespace CTCBulkOpLibTests
             CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
 
             List<OrganizationRequest> requests = new List<OrganizationRequest>();
-            for (int i = 0; i < 250; i++)
+            for (int i = 0; i < 50; i++)
             {
                 WhoAmIRequest req = new WhoAmIRequest();
                 requests.Add(req);
@@ -121,13 +161,13 @@ namespace CTCBulkOpLibTests
 
             var results = mgr.RunMultipleRequests(requests, batchSize: 5);
         }
-        private static void RunBulkInsertTest(IOrganizationService service)
+        private static void RunBulkInsertTest(IOrganizationService service,int recordsToInsert=50)
         {
 
             CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
 
             List<Entity> entityList = new List<Entity>();
-            for (int i = 0; i < 2000; i++)
+            for (int i = 0; i < recordsToInsert; i++)
             {
                 Entity entity = new Entity("account");
                 entity["name"] = "account " + DateTime.Now.ToString();
@@ -139,6 +179,24 @@ namespace CTCBulkOpLibTests
 
         [TestMethod]
         public void BulkInsertTest1()
+        {
+            ExecuteBulkInsertTest();
+
+        }
+        [TestMethod]
+        public void BulkInsertTest1TModeSingle()
+        {
+            ExecuteBulkInsertTest(transactionMode: CTCBulkTransactionMode.Single);
+
+        }
+        [TestMethod]
+        public void BulkInsertTest1TModeBatch()
+        {
+            ExecuteBulkInsertTest(transactionMode: CTCBulkTransactionMode.Batch);
+
+        }
+
+        private static void ExecuteBulkInsertTest(CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             CrmConnection c = new CrmConnection("CRM");
             OrganizationService service = new OrganizationService(c);
@@ -152,9 +210,10 @@ namespace CTCBulkOpLibTests
                 entityList.Add(entity);
             }
 
-            var results = mgr.BulkInsert(entityList);
-
+            var results = mgr.BulkInsert(entityList,transactionMode:transactionMode);
         }
+
+
 
         [TestMethod]
         public void BulkInsertTest2()
@@ -266,6 +325,25 @@ namespace CTCBulkOpLibTests
 
             var results = mgr.BulkUpdate(entityList, useUpsert: true);
 
+
+        }
+
+        [TestMethod]
+        public void BulkDeleteTest1()
+        {
+            CrmConnection c = new CrmConnection("CRM");
+            OrganizationService service = new OrganizationService(c);
+            CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
+
+            List<Entity> entityList = new List<Entity>();
+
+            QueryExpression q = new QueryExpression("account");
+            q.ColumnSet = new ColumnSet();
+            q.ColumnSet.AddColumn("accountid");
+            q.Criteria = new FilterExpression();
+            q.Criteria.AddCondition("name", ConditionOperator.BeginsWith, "bulk updated");
+
+            var results = mgr.BulkDelete(q, "Bulk Delete Test" + DateTime.Now.ToString());
 
         }
         [TestMethod]
