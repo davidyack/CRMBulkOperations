@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>CRMBulkOperations</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>David Yack</authors>
+    <owners>David Yack</owners>
+    <licenseUrl>https://github.com/davidyack/CRMBulkOperations/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/davidyack/CRMBulkOperations</projectUrl>    
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>The CRM Bulk Operations is a helper class to perform bulk operations with Dynamics CRM. The library has support for both Execute Multiple and Threads for batching multiple requests and managing sending them to Dynamics CRM. </description>
+    <releaseNotes>First preview release on CRM 2015 Spring Update - 7.1 Adds support for Upsert </releaseNotes>
+    <copyright>Copyright 2015</copyright>
+    <tags>CRM XRM Dynamics MSCRM</tags>
+  </metadata>
+</package>

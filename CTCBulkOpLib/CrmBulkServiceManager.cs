@@ -2,10 +2,9 @@
 //  File:		CrmBulkServiceManager
 //  Summary:	Manages the crm service for bulk calls
 // =====================================================================
+// 
 //
-//  This file is part of the ctccrm.ServerCommon library.
-//
-//  Copyright(C) 2013 Colorado Technology Consultants Inc.  All rights reserved.
+//  Copyright(C) 2015 Colorado Technology Consultants Inc.  All rights reserved.
 //
 //
 //  THIS CODE AND INFORMATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY
@@ -48,7 +47,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             _Service = crmService;
             _Services = new List<IOrganizationService>();
             _Services.Add(_Service);
-            
+
         }
 
         /// <summary>
@@ -63,14 +62,74 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             _Services.AddRange(serviceList);
 
         }
+        public CTCRunMultipleResponse BulkDelete(List<EntityReference> entityrefList, int batchSize = 500,
+           CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
+        {
+            var requests = new List<OrganizationRequest>();
+            foreach (var entityRef in entityrefList)
+            {
+                requests.Add(new DeleteRequest() { Target = entityRef });
+            }
 
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+            
+            return results;
+        }
+
+        public CTCRunMultipleResponse BulkUpsertAndDelete(List<Entity> entitiesToUpdate,List<EntityReference> entitiesToDelete, int batchSize = 500,
+           CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
+        {
+            var requests = new List<OrganizationRequest>();
+
+            foreach (var entity in entitiesToUpdate)
+            {
+                requests.Add(new UpsertRequest() { Target = entity });
+            }
+            foreach (var entityRef in entitiesToDelete)
+            {
+                requests.Add(new DeleteRequest() { Target = entityRef });
+            }
+
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+
+            return results;
+        }
+
+        /// <summary>
+        /// Bulk Delete By Query
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="jobName"></param>
+        /// <param name="sendEmail"></param>
+        /// <returns></returns>
+        public Guid BulkDelete(QueryExpression query, string jobName,bool sendEmail=true)
+        {
+
+            var wresp = _Service.Execute(new WhoAmIRequest()) as WhoAmIResponse;
+
+            BulkDeleteRequest deleteRequest = new BulkDeleteRequest()
+            {
+                JobName = jobName,
+                QuerySet = new[] { query },
+                StartDateTime = DateTime.Now,
+                ToRecipients = new[] { wresp.UserId},
+                CCRecipients = new Guid[] {},
+                SendEmailNotification=sendEmail,
+                RecurrencePattern=string.Empty
+            };
+            var deleteResponse = _Service.Execute(deleteRequest) as BulkDeleteResponse;
+
+            return deleteResponse.JobId;
+        }
         /// <summary>
         /// Bulk insert entities
         /// </summary>
         /// <param name="entityList"></param>
         /// <param name="batchSize"></param>
+        /// <param name="transactionMode"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkInsert(List<Entity> entityList, int batchSize = 500)
+        public CTCRunMultipleResponse BulkInsert(List<Entity> entityList, int batchSize = 500,
+            CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             var requests = new List<OrganizationRequest>();
             foreach (var entity in entityList)
@@ -78,7 +137,8 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 requests.Add(new CreateRequest() { Target = entity });
             }
 
-            var results = RunMultipleRequests(requests, batchSize: batchSize);
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+
             foreach (var item in results.ResultItems)
             {
                 var createResp = item.Response as CreateResponse;
@@ -87,26 +147,44 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             }
             return results;
         }
+
+
         /// <summary>
         /// Bulk update the list of entities provided
         /// </summary>
         /// <param name="entityList"></param>
         /// <param name="batchSize"></param>
+        /// <param name="useUpsert"></param>
+        /// <param name="transactionMode"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkUpdate(List<Entity> entityList, int batchSize = 500)
+        public CTCRunMultipleResponse BulkUpdate(List<Entity> entityList, int batchSize = 500,
+            bool useUpsert = false, CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             var requests = new List<OrganizationRequest>();
+
             foreach (var entity in entityList)
             {
-                requests.Add(new UpdateRequest() { Target = entity });
+                if (useUpsert)
+                    requests.Add(new UpsertRequest() { Target = entity });
+                else
+                    requests.Add(new UpdateRequest() { Target = entity });
             }
 
-            var results = RunMultipleRequests(requests, batchSize: batchSize);
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+
             foreach (var item in results.ResultItems)
             {
-                var updateReq = item.Request as UpdateRequest;
-                if (updateReq != null)
+                if (item.Request is UpdateRequest)
+                {
+                    var updateReq = item.Request as UpdateRequest;
                     item.ItemID = updateReq.Target.Id;
+                }
+                else if (item.Request is UpsertRequest)
+                {
+                    var upsertRequest = item.Request as UpsertRequest;
+                    var upsertResponse = item.Response as UpsertResponse;
+                    item.ItemID = upsertResponse.Target.Id;
+                }
             }
             return results;
         }
@@ -116,14 +194,14 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// </summary>
         /// <param name="q"></param>
         /// <param name="action"></param>
-        private void QueryToAction(QueryExpression q,  Action<EntityCollection> action)
+        private void QueryToAction(QueryExpression q, Action<EntityCollection> action)
         {
-            
+
             int pageCount = 1;
 
             while (true)
             {
-                
+
                 var results = _Service.RetrieveMultiple(q);
 
                 action(results);
@@ -140,7 +218,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                     break;
             }
 
-            
+
         }
         /// <summary>
         /// Query records, update with data provided in UpdateEntity
@@ -149,11 +227,12 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// <param name="updateEntity"></param>
         /// <param name="batchSize"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkUpdate(QueryExpression q, Entity updateEntity, int batchSize = 500)
+        public CTCRunMultipleResponse BulkUpdate(QueryExpression q, Entity updateEntity, int batchSize = 500,
+            CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             CTCRunMultipleResponse finalResults = new CTCRunMultipleResponse();
             finalResults.ResultItems = new List<CTCRunMultipleResponseItem>();
-            
+
             QueryToAction(q, (entityList) =>
             {
 
@@ -167,10 +246,10 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                     entitiesToUpdate.Add(updatedEntity);
                 }
 
-                var results = BulkUpdate(entitiesToUpdate, batchSize: batchSize);
+                var results = BulkUpdate(entitiesToUpdate, batchSize: batchSize, transactionMode: transactionMode);
                 finalResults.ResultItems.AddRange(results.ResultItems);
                 finalResults.StoppedEarly = results.StoppedEarly;
-                
+
             });
 
             return finalResults;
@@ -183,7 +262,8 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// <param name="status"></param>
         /// <param name="batchSize"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkSetState(QueryExpression q, OptionSetValue state, OptionSetValue status, int batchSize = 100)
+        public CTCRunMultipleResponse BulkSetState(QueryExpression q, OptionSetValue state, OptionSetValue status,
+            int batchSize = 100, CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             CTCRunMultipleResponse finalResults = new CTCRunMultipleResponse();
             finalResults.ResultItems = new List<CTCRunMultipleResponseItem>();
@@ -198,7 +278,8 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                     requests.Add(new SetStateRequest() { EntityMoniker = entity.ToEntityReference(), State = state, Status = status });
                 }
 
-                var results = RunMultipleRequests(requests, batchSize: batchSize);
+                var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+
                 finalResults.ResultItems.AddRange(results.ResultItems);
                 finalResults.StoppedEarly = results.StoppedEarly;
             });
@@ -214,7 +295,8 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// <param name="status"></param>
         /// <param name="batchSize"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkSetState(List<Entity> entityList, OptionSetValue state, OptionSetValue status, int batchSize = 100)
+        public CTCRunMultipleResponse BulkSetState(List<Entity> entityList, OptionSetValue state, OptionSetValue status,
+            int batchSize = 100, CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             var requests = new List<OrganizationRequest>();
             foreach (var entity in entityList)
@@ -222,7 +304,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 requests.Add(new SetStateRequest() { EntityMoniker = entity.ToEntityReference(), State = state, Status = status });
             }
 
-            var results = RunMultipleRequests(requests, batchSize: batchSize);
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
 
             return results;
         }
@@ -234,7 +316,8 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// <param name="workflowID"></param>
         /// <param name="batchSize"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkRunWorkflow(QueryExpression q, Guid workflowID, int batchSize = 100)
+        public CTCRunMultipleResponse BulkRunWorkflow(QueryExpression q, Guid workflowID,
+             int batchSize = 100, CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             CTCRunMultipleResponse finalResults = new CTCRunMultipleResponse();
             finalResults.ResultItems = new List<CTCRunMultipleResponseItem>();
@@ -249,7 +332,8 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                     requests.Add(new ExecuteWorkflowRequest() { WorkflowId = workflowID, EntityId = entity.Id });
                 }
 
-                var results = RunMultipleRequests(requests, batchSize: batchSize);
+                var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
+
                 finalResults.ResultItems.AddRange(results.ResultItems);
                 finalResults.StoppedEarly = results.StoppedEarly;
             });
@@ -257,14 +341,17 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
 
             return finalResults;
         }
+
         /// <summary>
         /// Run a workflow for each entity in list
         /// </summary>
         /// <param name="entityList"></param>
         /// <param name="workflowID"></param>
         /// <param name="batchSize"></param>
+        /// <param name="transactionMode"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse BulkRunWorkflow(List<Entity> entityList, Guid workflowID, int batchSize = 100)
+        public CTCRunMultipleResponse BulkRunWorkflow(List<Entity> entityList, Guid workflowID,
+            int batchSize = 100, CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
             var requests = new List<OrganizationRequest>();
             foreach (var entity in entityList)
@@ -272,9 +359,19 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 requests.Add(new ExecuteWorkflowRequest() { WorkflowId = workflowID, EntityId = entity.Id });
             }
 
-            var results = RunMultipleRequests(requests, batchSize: batchSize);
+            var results = RunMultipleRequests(requests, batchSize: batchSize, transactionMode: transactionMode);
 
             return results;
+        }
+        /// <summary>
+        /// Run an array of transactions
+        /// </summary>
+        /// <param name="requests"></param>
+        /// <returns></returns>
+        public CTCRunMultipleResponse BulkTransaction(OrganizationRequest[] requests)
+        {
+            return RunMultipleRequests(requests.ToList< OrganizationRequest>(), transactionMode: CTCBulkTransactionMode.Single );
+
         }
         /// <summary>
         /// Worker method to run multiple requests used by all helper methods but can be used standalone to invoke any series of CRM Organization Requests
@@ -285,8 +382,11 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// <param name="continueOnError"></param>
         /// <param name="retryCount"></param>
         /// <param name="retrySeconds"></param>
+        /// <param name="transactionMode"></param>
         /// <returns></returns>
-        public CTCRunMultipleResponse RunMultipleRequests(List<OrganizationRequest> requests, int batchSize = 100, bool returnResponses = true, bool continueOnError = true, int retryCount = 3, int retrySeconds = 10)
+        public CTCRunMultipleResponse RunMultipleRequests(List<OrganizationRequest> requests, int batchSize = 100,
+                bool returnResponses = true, bool continueOnError = true, int retryCount = 3, int retrySeconds = 10,
+                CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
         {
 
             CTCRunMultipleState state = new CTCRunMultipleState();
@@ -298,6 +398,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             state.BatchSize = batchSize;
             state.ContinueOnError = continueOnError;
             state.ReturnResponses = true;
+            state.TransactionMode = transactionMode;
             state.Requests = requests;
 
 
@@ -316,7 +417,10 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             {
                 while (state.RequestIndex < state.Requests.Count)
                 {
-                    RunMultipleRequestsInternalBatch(state);
+                    if (state.TransactionMode == CTCBulkTransactionMode.Single)
+                        RunMultipleRequestsInternalBatchTransaction(state);
+                    else
+                        RunMultipleRequestsInternalBatch(state);
 
                     if (state.Results.StoppedEarly)
                     {
@@ -347,8 +451,11 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 //return request index to last position
                 state.RequestIndex -= state.BatchSize;
                 var allowedBatchSize = Convert.ToInt32(fault.Detail.ErrorDetails["MaxBatchSize"]);
-                state.BatchSize = allowedBatchSize;
-                return RunMultipleRequestsInternal(state);
+                if (state.TransactionMode != CTCBulkTransactionMode.Single)
+                {
+                    state.BatchSize = allowedBatchSize;
+                    return RunMultipleRequestsInternal(state);
+                }
             }
             if (fault.Detail.ErrorDetails.Contains("Server Busy"))
             {
@@ -391,26 +498,22 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 {
                     if (currentTask.Requests.Count() > 1)
                     {
+
                         ExecuteMultipleRequest req = new ExecuteMultipleRequest() { Settings = new ExecuteMultipleSettings(), Requests = new OrganizationRequestCollection() };
                         req.Settings.ContinueOnError = currentTask.ContinueOnError;
                         req.Settings.ReturnResponses = currentTask.ReturnResponses;
-                        req.Requests.AddRange(currentTask.Requests);
-                        var response = _Service.Execute(req) as ExecuteMultipleResponse;
-
-                        foreach (var item in response.Responses)
+                        if (state.TransactionMode == CTCBulkTransactionMode.None)
+                            req.Requests.AddRange(currentTask.Requests);
+                        else
                         {
-                            CTCRunMultipleResponseItem resultItem = new CTCRunMultipleResponseItem();
-
-                            resultItem.Fault = item.Fault;
-                            resultItem.Request = req.Requests[item.RequestIndex];
-                            resultItem.Response = item.Response;
-                            currentTask.Responses.Add(resultItem);
-
+                            ExecuteTransactionRequest tranRequest = new ExecuteTransactionRequest() { Requests = new OrganizationRequestCollection() };
+                            tranRequest.Requests.AddRange(currentTask.Requests);
+                            tranRequest.ReturnResponses = state.ReturnResponses;
+                            req.Requests.Add(tranRequest);
+                            req.Settings.ReturnResponses=true;
                         }
-                        if ((!state.ContinueOnError) && (response.IsFaulted))
-                        {
-                            state.Results.StoppedEarly = true;
-                        }
+
+                        RunMultipleRequestsExecuteMultiple(state, currentTask, req);
                     }
                     else
                     {
@@ -428,17 +531,100 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                         }
                     }
 
-                    
+
                 });
 
-            foreach(var task in taskStateList)
+            foreach (var task in taskStateList)
             {
                 state.Results.ResultItems.AddRange(task.Responses);
             }
-           
+
+        }
+
+        private void RunMultipleRequestsExecuteMultiple(CTCRunMultipleState state, CTCRunMultipleTaskState currentTask, ExecuteMultipleRequest req)
+        {
+            try
+            {
+                var response = _Service.Execute(req) as ExecuteMultipleResponse;
+
+                if (state.TransactionMode == CTCBulkTransactionMode.None)
+                {
+                    var requestList = currentTask.Requests.ToArray<OrganizationRequest>();
+
+                    foreach (var item in response.Responses)
+                    {
+                        CTCRunMultipleResponseItem resultItem = new CTCRunMultipleResponseItem();
+                        resultItem.Fault = item.Fault;
+                        resultItem.Request = requestList[item.RequestIndex];
+                        resultItem.Response = item.Response;
+                        currentTask.Responses.Add(resultItem);
+
+                    }
+                }
+                else
+                {
+                    var tranResponse = response.Responses.FirstOrDefault().Response as ExecuteTransactionResponse;
+                    int requestIndex = 0;
+                    foreach (var item in tranResponse.Responses)
+                    {
+                        var requestList = currentTask.Requests.ToArray<OrganizationRequest>();
+                        CTCRunMultipleResponseItem resultItem = new CTCRunMultipleResponseItem();
+                        resultItem.Request = requestList[requestIndex];
+                        requestIndex++;
+                        resultItem.Response = item;
+                        currentTask.Responses.Add(resultItem);
+
+                    }
+                }
+                if ((!state.ContinueOnError) && (response.IsFaulted))
+                {
+                    state.Results.StoppedEarly = true;
+                }
+            }
+
+            catch (FaultException<OrganizationServiceFault> fault)
+            {
+                RunMultipleRequestsHandleFault(state, fault);
+            }
+        }
+
+        private void RunMultipleRequestsInternalBatchTransaction(CTCRunMultipleState state)
+        {
+
+            CTCRunMultipleTaskState taskState = new CTCRunMultipleTaskState();
+            taskState.Service = _Service;
+            taskState.ReturnResponses = state.ReturnResponses;
+            taskState.ContinueOnError = state.ContinueOnError;
+            taskState.Requests = state.Requests.Skip(state.RequestIndex).Take(state.BatchSize);
+            state.RequestIndex += state.BatchSize;
+            taskState.Responses = new List<CTCRunMultipleResponseItem>();
+
+            ExecuteTransactionRequest req = new ExecuteTransactionRequest() { Requests = new OrganizationRequestCollection() };
+            req.Requests.AddRange(taskState.Requests);
+            try
+            {
+                var response = _Service.Execute(req) as ExecuteTransactionResponse;
+                int reqIndex = 0;
+                foreach (var item in response.Responses)
+                {
+                    CTCRunMultipleResponseItem resultItem = new CTCRunMultipleResponseItem();
+                    resultItem.Request = req.Requests[reqIndex];
+                    reqIndex++;
+                    resultItem.Response = item;
+                    taskState.Responses.Add(resultItem);
+                }
+            }
+
+            catch (FaultException<OrganizationServiceFault> fault)
+            {
+                RunMultipleRequestsHandleFault(state, fault);
+            }
+
+            state.Results.ResultItems.AddRange(taskState.Responses);
         }
 
     }
+
 
     /// <summary>
     /// represents result of bulk and multiple operations
@@ -477,6 +663,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         public bool ContinueOnError { get; set; }
         public bool ReturnResponses { get; set; }
         public int BatchSize { get; set; }
+        public CTCBulkTransactionMode TransactionMode { get; set; }
         public List<OrganizationRequest> Requests { get; set; }
 
     }
@@ -487,8 +674,14 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
 
         public IEnumerable<OrganizationRequest> Requests { get; set; }
 
-        public  List<CTCRunMultipleResponseItem> Responses { get; set; }
+        public List<CTCRunMultipleResponseItem> Responses { get; set; }
         public bool ContinueOnError { get; set; }
         public bool ReturnResponses { get; set; }
     }
+    public enum CTCBulkTransactionMode
+    {
+        None,
+        Single,
+        Batch
+    };
 }
