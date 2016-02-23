@@ -25,6 +25,7 @@ using Microsoft.Xrm.Sdk.Messages;
 using Microsoft.Xrm.Sdk.Query;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.ServiceModel;
 using System.Threading;
@@ -38,15 +39,18 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
 
         private List<IOrganizationService> _Services = null;
 
+        private Action<CrmBulkOpStatus> _StatusAction = null;
+
         /// <summary>
         /// Create an instance and set the Organization Service to use
         /// </summary>
         /// <param name="crmService"></param>
-        public CrmBulkServiceManager(IOrganizationService crmService)
+        public CrmBulkServiceManager(IOrganizationService crmService, Action<CrmBulkOpStatus> statusAction = null)
         {
             _Service = crmService;
             _Services = new List<IOrganizationService>();
             _Services.Add(_Service);
+            _StatusAction = statusAction;
 
         }
 
@@ -55,12 +59,12 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
         /// cause requests to be processed using multiple threads
         /// </summary>
         /// <param name="serviceList"></param>
-        public CrmBulkServiceManager(List<IOrganizationService> serviceList)
+        public CrmBulkServiceManager(List<IOrganizationService> serviceList, Action<CrmBulkOpStatus> statusAction = null)
         {
             _Service = serviceList.FirstOrDefault(); ;
             _Services = new List<IOrganizationService>();
             _Services.AddRange(serviceList);
-
+            _StatusAction = statusAction;
         }
         public CTCRunMultipleResponse BulkDelete(List<EntityReference> entityrefList, int batchSize = 500,
            CTCBulkTransactionMode transactionMode = CTCBulkTransactionMode.None)
@@ -417,10 +421,16 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             {
                 while (state.RequestIndex < state.Requests.Count)
                 {
+                    LogStatusStart(CrmBulkOpStatusType.BatchStart, "RunMultipleRequestsInternal", 0); ;
+                    Stopwatch sw = new Stopwatch();
+                    sw.Start();
                     if (state.TransactionMode == CTCBulkTransactionMode.Single)
                         RunMultipleRequestsInternalBatchTransaction(state);
                     else
                         RunMultipleRequestsInternalBatch(state);
+
+                    sw.Stop();
+                    LogStatusEnd(CrmBulkOpStatusType.BatchEnd, "RunMultipleRequestsInternal", 0, sw.ElapsedMilliseconds);
 
                     if (state.Results.StoppedEarly)
                     {
@@ -494,7 +504,7 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                 taskState.Responses = new List<CTCRunMultipleResponseItem>();
                 taskStateList.Add(taskState);
             }
-            Parallel.ForEach<CTCRunMultipleTaskState>(taskStateList, currentTask =>
+            Parallel.ForEach<CTCRunMultipleTaskState>(taskStateList, new ParallelOptions {  MaxDegreeOfParallelism = _Services.Count }, currentTask =>
                 {
                     if (currentTask.Requests.Count() > 1)
                     {
@@ -512,8 +522,13 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
                             req.Requests.Add(tranRequest);
                             req.Settings.ReturnResponses=true;
                         }
-
+                        Stopwatch sw = new Stopwatch();
+                        sw.Start();
+                        LogStatusStart(CrmBulkOpStatusType.ThreadStart, "RunMultipleRequestsInternalBatch", currentTask.Requests.Count());
                         RunMultipleRequestsExecuteMultiple(state, currentTask, req);
+                        sw.Stop();
+                        LogStatusEnd(CrmBulkOpStatusType.ThreadEnd, "RunMultipleRequestsInternalBatch", currentTask.Requests.Count(), sw.ElapsedMilliseconds);
+                        
                     }
                     else
                     {
@@ -621,6 +636,44 @@ namespace ctccrm.ServerCommon.OrgServiceHelpers
             }
 
             state.Results.ResultItems.AddRange(taskState.Responses);
+        }
+
+        private void LogStatusStart(CrmBulkOpStatusType type,string message, int count)
+        {
+            if (_StatusAction == null)
+                return;
+            CrmBulkOpStatus status = new CrmBulkOpStatus();
+            status.Type = type;
+            status.Count = count;
+            status.Message = message;
+            status.ThreadID = Thread.CurrentThread.ManagedThreadId;
+
+            try
+            {
+                _StatusAction(status);
+            }
+            catch (Exception)
+            { }
+
+        }
+        private void LogStatusEnd(CrmBulkOpStatusType type, string message, int count, long elappsed)
+        {
+            if (_StatusAction == null)
+                return;
+            CrmBulkOpStatus status = new CrmBulkOpStatus();
+            status.Type = type;
+            status.Count = count;
+            status.Message = message;
+            status.ElapsedMS = elappsed;
+            status.ThreadID = Thread.CurrentThread.ManagedThreadId;
+
+            try
+            {
+                _StatusAction(status);
+            }
+            catch (Exception)
+            { }
+
         }
 
     }

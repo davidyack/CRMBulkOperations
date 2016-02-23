@@ -221,7 +221,7 @@ namespace CTCBulkOpLibTests
             CrmConnection c = new CrmConnection("CRM");
             List<IOrganizationService> services = new List<IOrganizationService>();
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 4; i++)
             {
                 OrganizationService service = new OrganizationService(c);
                 services.Add(service);
@@ -230,14 +230,14 @@ namespace CTCBulkOpLibTests
             CrmBulkServiceManager mgr = new CrmBulkServiceManager(services);
 
             List<Entity> entityList = new List<Entity>();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 480; i++)
             {
                 Entity entity = new Entity("account");
                 entity["name"] = "account " + DateTime.Now.ToString();
                 entityList.Add(entity);
             }
 
-            var results = mgr.BulkInsert(entityList,batchSize:1);
+            var results = mgr.BulkInsert(entityList,batchSize:120);
 
         }
 
@@ -249,7 +249,7 @@ namespace CTCBulkOpLibTests
             CrmBulkServiceManager mgr = new CrmBulkServiceManager(service);
 
             List<Entity> entityList = new List<Entity>();
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 2; i++)
             {
                 Entity entity = new Entity("account");
                 entity["name"] = "account " + DateTime.Now.ToString();
