@@ -16,7 +16,6 @@ D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\bin\Debug\Microsoft.Crm.Sdk.Proxy
 D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\bin\Debug\Microsoft.Xrm.Sdk.xml
 D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\bin\Debug\Microsoft.Xrm.Sdk.Deployment.xml
 D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\obj\Debug\CTCImportSpeedTest.csprojResolveAssemblyReference.cache
-D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\obj\Debug\CTCImportSpeedTest.csproj.CTCImportSpeedTest.exe.config
 D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\obj\Debug\CTCImportSpeedTest.exe
 D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\obj\Debug\CTCImportSpeedTest.pdb
 D:\GitHub\CRMBulkOperations\CTCImportSpeedTest\bin\Debug\Microsoft.IdentityModel.Clients.ActiveDirectory.dll
