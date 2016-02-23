@@ -1,4 +1,4 @@
-CRM Bulk Operations API - CRM 2015 Spring Update (7.1 )
+CRM Bulk Operations API - CRM 2016 (8.0 )
 =================
 
 See Pre71 branch for CRM 2015 and CRM 2015 version of the API
