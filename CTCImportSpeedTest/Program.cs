@@ -1,9 +1,9 @@
 ﻿using ctccrm.ServerCommon.OrgServiceHelpers;
-using Microsoft.Xrm.Client;
-using Microsoft.Xrm.Client.Services;
 using Microsoft.Xrm.Sdk;
+using Microsoft.Xrm.Tooling.Connector;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
@@ -15,16 +15,19 @@ namespace CTCImportSpeedTest
     {
         static void Main(string[] args)
         {
-            int TotalRecordsToProcess = 480;
+            int TotalRecordsToProcess = 1000;
             int ThreadsToUse = 2;
             int BatchSize = 50;
 
-            CrmConnection c = new CrmConnection("CRM");
+            var connectionString = ConfigurationManager.ConnectionStrings["CRM"].ConnectionString;
+            
+
             List<IOrganizationService> services = new List<IOrganizationService>();
 
             for (int i = 0; i < ThreadsToUse; i++)
             {
-                OrganizationService service = new OrganizationService(c);
+                CrmServiceClient connection = new CrmServiceClient(connectionString);
+                IOrganizationService service = connection.OrganizationServiceProxy as IOrganizationService;
                 services.Add(service);
             }
 
@@ -50,7 +53,7 @@ namespace CTCImportSpeedTest
                 refList.Add(refItem);
             }
             Console.WriteLine("Cleanup Starting");
-            mgr.BulkDelete(refList,batchSize:50);
+           // mgr.BulkDelete(refList,batchSize:50);
             Console.WriteLine("Cleanup completed");
 
         }
