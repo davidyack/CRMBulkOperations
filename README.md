@@ -1,4 +1,4 @@
-CRM Bulk Operations API - CRM 2016 (8.0 )
+CRM Bulk Operations API - Dynamics 365 (8.2 )
 =================
 
 See Pre71 branch for CRM 2015 and CRM 2015 version of the API
